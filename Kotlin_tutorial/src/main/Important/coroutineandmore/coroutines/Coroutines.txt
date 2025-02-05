@@ -1,0 +1,584 @@
+Coroutines:
+>Execute inside a thread.
+>One thread can have many coroutines.
+>Cheap.
+
+A coroutine is an instance of a suspendable computation. It is conceptually similar to a thread,
+ in the sense that it takes a block of code to run that works concurrently with the rest
+ of the code. However, a coroutine is not bound to any particular thread. It may suspend its
+ execution in one thread and resume in another one.
+
+ Coroutines can be thought of as light-weight threads, but there is a number of important
+ differences that make their real-life usage very different from threads.
+
+ To define coroutine, we need:
+
+ > Coroutine Scope : Lifetime.
+ > Coroutine Context: on which thread our coroutine launch.
+
+ Dispatchers: CoroutineContext:
+
+ > It is a way to define threads on which Coroutines are executed.
+
+ Predefined Dispatchers:
+
+ > Dispatchers.IO : for input/ output
+ > Dispatchers.Main : to execute on main thread.
+ > Dispatchers.Default: to execute on default thread.
+
+
+ for coroutines:
+
+ implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.3.9")
+
+
+
+ CoroutineScope:
+
+ In Kotlin, a CoroutineScope is an interface that defines a scope for new coroutines.
+ It's an essential concept in Kotlin Coroutines, allowing you to launch new coroutines
+ within a specific lifecycle or context, ensuring proper cancellation and structured concurrency.
+
+ Here's an overview and a brief guide on how to use CoroutineScope:
+
+ 1. Basics of CoroutineScope
+ A CoroutineScope provides a lifecycle for coroutines launched within it. When the scope is
+ cancelled, all coroutines within it are also cancelled.
+
+ 2. Creating a CoroutineScope
+ You can create a CoroutineScope using the CoroutineScope function and passing a CoroutineContext
+ such as a Job or a Dispatcher.
+
+ import kotlinx.coroutines.*
+
+ fun main() {
+     val scope = CoroutineScope(Dispatchers.Main)
+
+     scope.launch {
+         // Coroutine body
+         delay(1000L)
+         println("Coroutine in scope")
+     }
+
+     // Cancel the scope and its coroutines
+     scope.cancel()
+ }
+
+
+3. CoroutineScope in Classes
+   When you want to manage coroutines in a class (e.g., ViewModel or Android Activity), you should define a CoroutineScope within that class.
+
+   Example with ViewModel:
+
+   class MyViewModel : ViewModel() {
+       private val viewModelJob = Job()
+       private val viewModelScope = CoroutineScope(Dispatchers.Main + viewModelJob)
+
+       fun fetchData() {
+           viewModelScope.launch {
+               // Coroutine body
+               val data = fetchDataFromNetwork()
+               // Update UI
+           }
+       }
+
+       override fun onCleared() {
+           super.onCleared()
+           viewModelJob.cancel() // Cancel all coroutines when ViewModel is cleared
+       }
+
+       private suspend fun fetchDataFromNetwork(): String {
+           // Simulate network call
+           delay(2000L)
+           return "Data"
+       }
+   }
+
+
+4. CoroutineScope in Android Activity or Fragment
+To manage coroutines within an Activity or Fragment, you can use lifecycle-aware scopes like lifecycleScope or viewLifecycleOwner.lifecycleScope.
+
+Example with Activity:
+
+
+class MyActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        // Using lifecycleScope for lifecycle-aware coroutines
+        lifecycleScope.launch {
+            // Coroutine body
+            delay(1000L)
+            println("Coroutine in Activity scope")
+        }
+    }
+}
+
+
+Example with Fragment:
+
+
+class MyFragment : Fragment() {
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Using viewLifecycleOwner.lifecycleScope for lifecycle-aware coroutines
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Coroutine body
+            delay(1000L)
+            println("Coroutine in Fragment scope")
+        }
+    }
+}
+
+
+5. Structured Concurrency
+Kotlin Coroutines promote structured concurrency, meaning child coroutines are bound to the scope and will be automatically cancelled when the scope is cancelled.
+
+Example:
+
+
+fun main() {
+    runBlocking {
+        val parentScope = CoroutineScope(Dispatchers.Default)
+
+        parentScope.launch {
+            launch {
+                delay(1000L)
+                println("Child coroutine 1")
+            }
+            launch {
+                delay(2000L)
+                println("Child coroutine 2")
+            }
+        }
+
+        delay(1500L)
+        parentScope.cancel() // Cancel parent scope and all its child coroutines
+        println("Parent scope cancelled")
+    }
+}
+
+
+Types of Coroutines Scopes:
+
+
+
+In Kotlin, there are several types of CoroutineScope that you can use to manage the lifecycle of
+coroutines, each suited for different use cases. Here are the main types of coroutine scopes available in Kotlin:
+
+1. GlobalScope:
+Description: A global scope for launching top-level coroutines that are not tied to any specific job or lifecycle.
+Use Case: Use sparingly for long-running, application-wide tasks.
+
+Definition: GlobalScope is a global coroutine scope that is not bound to any specific lifecycle.
+Coroutines launched in this scope live until they complete or the application exits.
+
+Lifecycle Management: Coroutines launched in GlobalScope are not tied to any specific lifecycle
+(e.g., activity, fragment, etc.). This means they can easily lead to memory leaks if not handled properly.
+Usage: Typically used for top-level coroutines that are intended to run for the entire lifetime of the application.
+
+Example:
+GlobalScope.launch {
+    // Coroutine running in GlobalScope
+    delay(1000L)
+    println("GlobalScope coroutine")
+}
+
+
+2. CoroutineScope
+Description: A custom scope that you can create by combining a Job and a Dispatcher. It provides more control over coroutine lifecycle management.
+Use Case: Useful when you need a scope tied to a specific lifecycle or context.
+Example:
+
+val customScope = CoroutineScope(Dispatchers.Main + Job())
+customScope.launch {
+    // Coroutine running in custom scope
+    delay(1000L)
+    println("Custom CoroutineScope")
+}
+
+
+3. MainScope
+Description: A scope bound to the Dispatchers.Main dispatcher, commonly used in Android for UI-related tasks.
+Use Case: Ideal for Android activities and fragments to perform UI updates.
+Example:
+
+
+val mainScope = MainScope()
+mainScope.launch {
+    // Coroutine running in MainScope
+    delay(1000L)
+    println("MainScope coroutine")
+}
+
+
+4. runBlocking
+Description: A function that creates a coroutine scope and blocks the current thread until all coroutines inside the block complete.
+Use Case: Useful in main functions and unit tests to run coroutines in a blocking manner.
+Example:
+
+runBlocking {
+    // Coroutine running in runBlocking scope
+    delay(1000L)
+    println("runBlocking coroutine")
+}   //  not allow other thread or coroutine to execute until all coroutine inside this block is get finished.
+
+
+5. lifecycleScope
+Description: A scope tied to the lifecycle of an Android LifecycleOwner (such as an Activity or Fragment).
+Use Case: Manages coroutines with respect to the lifecycle events, automatically cancelling coroutines when the lifecycle is destroyed.
+Example:
+
+
+class MyActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        lifecycleScope.launch {
+            // Coroutine running in lifecycleScope
+            delay(1000L)
+            println("lifecycleScope coroutine")
+        }
+    }
+}
+
+
+6. viewModelScope
+Description: A scope tied to the lifecycle of an Android ViewModel.
+Use Case: Ideal for managing coroutines within ViewModel classes, ensuring they are cancelled when the ViewModel is cleared.
+Example:
+
+class MyViewModel : ViewModel() {
+    fun fetchData() {
+        viewModelScope.launch {
+            // Coroutine running in viewModelScope
+            delay(1000L)
+            println("viewModelScope coroutine")
+        }
+    }
+}
+
+
+7. supervisorScope
+Description: A scope that creates a supervisor job for its coroutines. Child coroutines are not cancelled if one of them fails.
+Use Case: Useful for tasks where failure of one child coroutine should not affect the others.
+Example:
+
+supervisorScope {
+    launch {
+        // This child will not cancel others if it fails
+        throw Exception("Failed coroutine")
+    }
+    launch {
+        // This child will continue running even if the other fails
+        delay(1000L)
+        println("SupervisorScope coroutine")
+    }
+}
+
+
+
+Suspend modifier and Suspend Functions:
+
+In Kotlin, the suspend modifier is used to mark a function as a suspending function. Suspending
+functions are a central feature of Kotlin's coroutines, allowing you to write asynchronous,
+non-blocking code in a sequential style. Here's an overview of the suspend modifier and suspend functions:
+
+Suspend Modifier
+Purpose: The suspend modifier is used to define functions that can be paused and resumed at a later time without blocking the thread they are running on.
+Usage: You apply the suspend modifier to a function declaration.
+
+Suspend Function:
+
+Definition: A function that is marked with the suspend modifier.
+Characteristics:
+Can only be called from another suspend function or a coroutine.
+Allows you to use other suspend functions within its body.
+Doesn't block the thread while waiting for the result; instead, it suspends the execution and frees up the thread for other tasks.
+
+Example of Suspend Function
+Here's a simple example to illustrate how to define and use a suspend function:
+
+import kotlinx.coroutines.*
+
+suspend fun fetchData(): String {
+    // Simulate a long-running network request
+    delay(1000L)
+    return "Data from network"
+}
+
+fun main() = runBlocking {
+    println("Fetching data...")
+    val data = fetchData() // Call to the suspend function
+    println("Received: $data")
+}
+
+
+Key Points
+Non-blocking Nature:
+
+>Suspend functions can perform long-running operations without blocking the thread. For example,
+delay(1000L) suspends the coroutine for 1 second but doesn't block the thread.
+Sequential Style:
+
+>You can write asynchronous code in a sequential manner, making it more readable and maintainable.
+Coroutine Context:
+
+>Suspend functions need to be called from a coroutine context, which is established using coroutine builders like launch, async, or runBlocking.
+Chaining Suspend Functions:
+
+>You can call one suspend function from another, chaining them together to perform complex asynchronous operations.
+Advanced Example
+Here's a more complex example demonstrating multiple suspend functions and coroutine scopes:
+
+
+import kotlinx.coroutines.*
+
+suspend fun fetchUserData(): String {
+    delay(500L) // Simulate a network request
+    return "User data"
+}
+
+suspend fun fetchOrderData(): String {
+    delay(700L) // Simulate a network request
+    return "Order data"
+}
+
+suspend fun displayData() {
+    val userData = fetchUserData()
+    val orderData = fetchOrderData()
+    println("User Data: $userData")
+    println("Order Data: $orderData")
+}
+
+fun main() = runBlocking {
+    println("Fetching data...")
+    displayData() // Call to the suspend function
+    println("All data displayed.")
+}
+
+
+
+Coroutine Builders
+In Kotlin coroutines, runBlocking, launch, and async are coroutine builders that create
+coroutines and handle their execution differently. Understanding the differences between
+these builders is essential for writing efficient and effective coroutine-based code. Here's a detailed comparison:
+
+runBlocking: Used to bridge regular blocking code and coroutine code.
+
+Purpose: Bridges regular blocking code and coroutine code. It's primarily used in main functions and tests to start the top-level coroutine.
+Behavior: Blocks the current thread until the coroutine execution is complete.
+Return Value: Returns the result of the coroutine execution.
+Use Case: When you need to run a coroutine in a blocking manner, for example, in a main function or a unit test.
+
+
+fun main() = runBlocking {
+    // Code here runs in a coroutine scope
+}
+
+launch: Used to launch a new coroutine without blocking the current thread and returns a Job.
+
+Purpose: Launches a new coroutine without blocking the current thread and returns a Job representing the coroutine.
+Behavior: Does not block the current thread. The coroutine runs concurrently with the rest of the code.
+Return Value: Returns a Job, which can be used to manage the coroutine (e.g., to cancel it).
+Use Case: When you want to launch a coroutine that runs independently, typically for fire-and-forget tasks.
+
+fun main() = runBlocking {
+    launch {
+        // Code here runs in a coroutine
+    }
+}
+
+
+async: Used to launch a new coroutine and returns a Deferred that represents a future result.
+
+Purpose: Launches a new coroutine and returns a Deferred representing a future result, allowing you to perform concurrent operations and wait for their results.
+Behavior: Does not block the current thread. The coroutine runs concurrently with the rest of the code.
+Return Value: Returns a Deferred<T>, which can be used to obtain the result of the coroutine (e.g., using await).
+Use Case: When you want to run a coroutine that returns a result, typically for parallel tasks that need to be aggregated.
+
+fun main() = runBlocking {
+    val deferred = async {
+        // Code here runs in a coroutine
+        "Result"
+    }
+    println("Result: ${deferred.await()}")
+}
+
+
+In Kotlin, coroutines provide a structured concurrency mechanism, where each coroutine has a Job
+that represents its lifecycle. Understanding Job and its cancellation is crucial for effectively managing coroutines. Here's a detailed explanation:
+
+Job in Kotlin Coroutines
+A Job represents a coroutine and its lifecycle. It can be used to manage the coroutine, such as starting, stopping, and waiting for its completion.
+
+Job Lifecycle:
+New: The coroutine is created but not yet started.
+Active: The coroutine is running.
+Completing: The coroutine is finishing its execution.
+Completed: The coroutine has finished successfully.
+Cancelled: The coroutine has been cancelled.
+
+Creating and Managing Jobs
+You can create a Job when launching a coroutine using builders like launch or async.
+
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    val job = launch {
+        // Coroutine code
+        repeat(1000) { i ->
+            println("Job: I'm sleeping $i ...")
+            delay(500L)
+        }
+    }
+    delay(1300L) // Delay a bit
+    println("Main: I'm tired of waiting!")
+    job.cancel() // Cancels the job
+    job.join() // Waits for job's completion
+    println("Main: Now I can quit.")
+}
+
+
+Cancelling a Coroutine
+Cancellation is cooperative. A coroutine code must check for cancellation and respond
+appropriately. Many suspending functions in Kotlin coroutines are cancellable, including delay,
+yield, and functions that perform blocking I/O operations.
+
+Checking for Cancellation
+You can check for cancellation explicitly using isActive property or ensureActive function.
+
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    val job = launch {
+        repeat(1000) { i ->
+            if (!isActive) return@launch // Check if the coroutine is still active
+            println("Job: I'm sleeping $i ...")
+            delay(500L)
+        }
+    }
+    delay(1300L)
+    println("Main: I'm tired of waiting!")
+    job.cancelAndJoin() // Cancels and waits for completion
+    println("Main: Now I can quit.")
+}
+
+
+Using finally for Cleanup
+You can perform cleanup actions in a finally block when the coroutine is cancelled.
+
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    val job = launch {
+        try {
+            repeat(1000) { i ->
+                println("Job: I'm sleeping $i ...")
+                delay(500L)
+            }
+        } finally {
+            println("Job: I'm running finally")
+        }
+    }
+    delay(1300L)
+    println("Main: I'm tired of waiting!")
+    job.cancelAndJoin()
+    println("Main: Now I can quit.")
+}
+
+
+Cancellation Exceptions
+When a coroutine is cancelled, it throws a CancellationException. This exception is usually
+handled internally and not propagated further.
+
+Timeout for Coroutines
+You can use withTimeout or withTimeoutOrNull to specify a timeout for a coroutine.
+If the coroutine doesn't complete within the specified time, it is cancelled.
+
+
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    try {
+        withTimeout(1300L) {
+            repeat(1000) { i ->
+                println("I'm sleeping $i ...")
+                delay(500L)
+            }
+        }
+    } catch (e: TimeoutCancellationException) {
+        println("Timed out!")
+    }
+}
+
+
+> withContext():
+
+In Kotlin, withContext is a function used within coroutines to change the context in which a
+block of code is executed. This is particularly useful for switching to a different dispatcher,
+such as switching from the main thread to an IO thread for network operations or disk access.
+It ensures that the code within the withContext block runs in the specified coroutine context,
+and then the execution returns to the previous context after the block completes.
+
+context: The coroutine context to switch to.
+block: The block of code to execute within the new context.
+Example Usage
+Switching to an IO Dispatcher
+Here’s a common use case where withContext is used to perform IO operations off the main thread:
+
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    val result = withContext(Dispatchers.IO) {
+        // Simulate a network call or database operation
+        delay(1000L)
+        "Data from IO operation"
+    }
+    println(result)
+}
+
+
+Performing CPU-Intensive Work
+Switching to the Default dispatcher for CPU-intensive tasks:
+
+import kotlinx.coroutines.*
+
+fun main() = runBlocking {
+    val result = withContext(Dispatchers.Default) {
+        // Perform a CPU-intensive task
+        (1..1_000_000).sum()
+    }
+    println("The sum is $result")
+}
+
+
+Practical Use Case: Network Request
+Here's a more realistic example where you might use withContext to perform a network request:
+
+import kotlinx.coroutines.*
+
+suspend fun fetchData(): String {
+    return withContext(Dispatchers.IO) {
+        // Simulate a network request
+        delay(1000L)
+        "Fetched data"
+    }
+}
+
+fun main() = runBlocking {
+    val data = fetchData()
+    println(data)
+}
+
+
+Advantages of withContext
+Simplifies Code: Makes it easier to switch contexts within a coroutine without having to manually manage threads.
+Readability: Improves readability by clearly indicating where context switches occur.
+Structured Concurrency: Ensures that the context switch is part of the coroutine’s structured
+concurrency, meaning it will properly handle cancellations and exceptions.
